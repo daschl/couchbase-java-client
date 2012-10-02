@@ -66,7 +66,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A CouchbaseClientTest.
+ * Tests the Couchbase View operations.
  */
 public class ViewTest {
 
