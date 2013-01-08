@@ -111,6 +111,7 @@
   <property name="server.address_v6" value="::1"/>
   <property name="server.type" value="memcached"/>
   <property name="test.type" value="unit"/>
+  <property name="mock.url" value="http://files.couchbase.com/maven2/org/couchbase/mock/CouchbaseMock/0.5-SNAPSHOT" />
 
   <!--this is the naming policy for artifacts we want pulled down-->
   <property name="ivy.artifact.retrieve.pattern"
@@ -229,6 +230,37 @@
   <target name="report" depends="ivy-retrieve"
       description="Generates a report of dependencies">
     <ivy:report todir="${build.dir}"/>
+  </target>
+
+  <target name="prepare-mock" description="Download and run CouchbaseMock">
+      <mkdir dir="${build.dir}/mock" />
+      <get src="${mock.url}/CouchbaseMock-0.5-20120726.220757-19.jar"
+           dest="${build.dir}/mock/CouchbaseMock.jar" />
+
+      <java jar="${build.dir}/mock/CouchbaseMock.jar" spawn="true" fork="true">
+        <arg line="--nodes=10 --host=localhost --port=8091" />
+      </java>
+  </target>
+
+  <target name="test-with-mock" depends="prepare-mock, test"
+          description="Run the test suite against CouchbaseMock">
+        <exec executable="jps">
+           <arg value="-l"/>
+           <redirector outputproperty="mock.pid.full">
+               <outputfilterchain>
+                   <linecontains>
+                     <contains value="CouchbaseMock"/>
+                   </linecontains>
+
+               </outputfilterchain>
+           </redirector>
+         </exec>
+      <propertyregex property="mock.pid" input="${mock.pid.full}" regexp="(\d+)\s" select="\1" />
+      <echo message="Killing ${mock.pid}" />
+      <exec executable="kill">
+          <arg value="-9" />
+          <arg value="${mock.pid}" />
+      </exec>
   </target>
 
   <target name="test" depends="compile, compile-test"
