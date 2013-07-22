@@ -23,10 +23,8 @@
 
 package net.spy.memcached.protocol.binary;
 
-import com.couchbase.client.CouchbaseClientBaseCase;
-import com.couchbase.client.CouchbaseConnectionFactory;
-import com.couchbase.client.FailInjectingCouchbaseConnectionFactory;
-import com.couchbase.client.TestingCouchbaseClient;
+import com.couchbase.client.*;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,6 +45,8 @@ import net.spy.memcached.ops.StoreType;
  */
 public class OptimizedStoreVbucketTest extends CouchbaseClientBaseCase {
   private TestingCouchbaseClient tclient;
+  private CouchbaseClient client;
+
   @Override
   protected void initClient() throws Exception {
     initClient(new FailInjectingCouchbaseConnectionFactory(Arrays.asList(

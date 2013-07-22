@@ -55,6 +55,8 @@ public class CouchbaseClientTest extends BinaryClientTest {
   // Constant for empty string
   private static final String EMPTY = "";
 
+  private CouchbaseClient client;
+
   /**
    * Initialises the client, deletes all the buckets
    * and creates a new default bucket.

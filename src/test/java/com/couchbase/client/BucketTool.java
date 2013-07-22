@@ -133,7 +133,7 @@ public class BucketTool extends SpyObject {
     }
   }
 
-  public void waitForWarmup(MemcachedClient client) throws Exception {
+  public void waitForWarmup(CouchbaseClient client) throws Exception {
     boolean warmup = true;
     while (warmup) {
       warmup = false;

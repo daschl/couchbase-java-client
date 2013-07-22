@@ -57,13 +57,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
@@ -73,17 +67,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import net.spy.memcached.AddrUtil;
-import net.spy.memcached.BroadcastOpFactory;
-import net.spy.memcached.CASResponse;
-import net.spy.memcached.CASValue;
-import net.spy.memcached.CachedData;
-import net.spy.memcached.MemcachedClient;
-import net.spy.memcached.MemcachedNode;
-import net.spy.memcached.ObserveResponse;
-import net.spy.memcached.OperationTimeoutException;
-import net.spy.memcached.PersistTo;
-import net.spy.memcached.ReplicateTo;
+
+import net.spy.memcached.*;
 import net.spy.memcached.internal.GetFuture;
 import net.spy.memcached.internal.OperationFuture;
 import net.spy.memcached.ops.GetlOperation;
@@ -93,6 +78,7 @@ import net.spy.memcached.ops.OperationCallback;
 import net.spy.memcached.ops.OperationStatus;
 import net.spy.memcached.ops.ReplicaGetOperation;
 import net.spy.memcached.ops.StatsOperation;
+import net.spy.memcached.transcoders.TranscodeService;
 import net.spy.memcached.transcoders.Transcoder;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpVersion;
@@ -110,8 +96,7 @@ import org.apache.http.message.BasicHttpRequest;
  * If you are working with Couchbase Server 2.0, remember to set the appropriate
  * view mode depending on your environment.
  */
-public class CouchbaseClient extends MemcachedClient
-  implements CouchbaseClientIF, Reconfigurable {
+public class CouchbaseClient extends MemcachedClientAdapter implements CouchbaseClientIF, Reconfigurable {
 
   private static final String MODE_PRODUCTION = "production";
   private static final String MODE_DEVELOPMENT = "development";
@@ -122,7 +107,15 @@ public class CouchbaseClient extends MemcachedClient
 
   private ViewConnection vconn = null;
   protected volatile boolean reconfiguring = false;
-  private final CouchbaseConnectionFactory cbConnFactory;
+  private CouchbaseConnectionFactory cbConnFactory;
+
+  private volatile boolean connected = false;
+  protected ExportingMemcachedClient memcachedClient;
+  protected MemcachedConnection mconn;
+  protected OperationFactory opFact;
+  protected long operationTimeout;
+  protected Transcoder<Object> transcoder;
+  protected TranscodeService tcService;
 
   /**
    * Try to load the cbclient.properties file and check for the viewmode.
@@ -238,8 +231,17 @@ public class CouchbaseClient extends MemcachedClient
    */
   public CouchbaseClient(CouchbaseConnectionFactory cf)
     throws IOException {
-    super(cf, AddrUtil.getAddresses(cf.getVBucketConfig().getServers()));
+    connect(cf);
+  }
+
+  public CouchbaseClient connect(final CouchbaseConnectionFactory cf) throws IOException {
     cbConnFactory = cf;
+    memcachedClient = new ExportingMemcachedClient(cf);
+    mconn = memcachedClient.getMemcachedConnection();
+    opFact = memcachedClient.getOperationFactory();
+    operationTimeout = memcachedClient.getOperationTimeout();
+    tcService = memcachedClient.getTranscodeService();
+    transcoder = memcachedClient.getTranscoder();
 
     if(cf.getVBucketConfig().getConfigType() == ConfigType.COUCHBASE) {
       List<InetSocketAddress> addrs =
@@ -249,6 +251,7 @@ public class CouchbaseClient extends MemcachedClient
 
     getLogger().info(MODE_ERROR);
     cf.getConfigurationProvider().subscribe(cf.getBucketName(), this);
+    return this;
   }
 
   /**
@@ -261,9 +264,8 @@ public class CouchbaseClient extends MemcachedClient
     if (bucket.isNotUpdating()) {
       getLogger().info("Bucket configuration is disconnected from cluster "
         + "configuration updates, attempting to reconnect.");
-      CouchbaseConnectionFactory cbcf = (CouchbaseConnectionFactory)connFactory;
-      cbcf.requestConfigReconnect(cbcf.getBucketName(), this);
-      cbcf.checkConfigUpdate();
+      cbConnFactory.requestConfigReconnect(cbConnFactory.getBucketName(), this);
+      cbConnFactory.checkConfigUpdate();
     }
     try {
       cbConnFactory.getConfigurationProvider().updateBucket(
@@ -317,15 +319,12 @@ public class CouchbaseClient extends MemcachedClient
   @Override
   public HttpFuture<View> asyncGetView(String designDocumentName,
       final String viewName) {
-    CouchbaseConnectionFactory factory =
-      (CouchbaseConnectionFactory) connFactory;
-
     designDocumentName = MODE_PREFIX + designDocumentName;
-    String bucket = factory.getBucketName();
+    String bucket = cbConnFactory.getBucketName();
     String uri = "/" + bucket + "/_design/" + designDocumentName;
     final CountDownLatch couchLatch = new CountDownLatch(1);
     final HttpFuture<View> crv = new HttpFuture<View>(couchLatch,
-      factory.getViewTimeout());
+      cbConnFactory.getViewTimeout());
 
     final HttpRequest request =
         new BasicHttpRequest("GET", uri, HttpVersion.HTTP_1_1);
@@ -375,14 +374,12 @@ public class CouchbaseClient extends MemcachedClient
   @Override
   public HttpFuture<SpatialView> asyncGetSpatialView(String designDocumentName,
       final String viewName) {
-    CouchbaseConnectionFactory factory =
-      (CouchbaseConnectionFactory) connFactory;
     designDocumentName = MODE_PREFIX + designDocumentName;
-    String bucket = factory.getBucketName();
+    String bucket = cbConnFactory.getBucketName();
     String uri = "/" + bucket + "/_design/" + designDocumentName;
     final CountDownLatch couchLatch = new CountDownLatch(1);
     final HttpFuture<SpatialView> crv = new HttpFuture<SpatialView>(
-      couchLatch, factory.getViewTimeout());
+      couchLatch, cbConnFactory.getViewTimeout());
 
     final HttpRequest request =
         new BasicHttpRequest("GET", uri, HttpVersion.HTTP_1_1);
@@ -425,7 +422,7 @@ public class CouchbaseClient extends MemcachedClient
   public HttpFuture<DesignDocument> asyncGetDesignDocument(
     String designDocumentName) {
     designDocumentName = MODE_PREFIX + designDocumentName;
-    String bucket = ((CouchbaseConnectionFactory)connFactory).getBucketName();
+    String bucket = cbConnFactory.getBucketName();
     String uri = "/" + bucket + "/_design/" + designDocumentName;
     final CountDownLatch couchLatch = new CountDownLatch(1);
     final HttpFuture<DesignDocument> crv =
@@ -596,7 +593,7 @@ public class CouchbaseClient extends MemcachedClient
   public HttpFuture<Boolean> asyncCreateDesignDoc(String name, String value)
     throws UnsupportedEncodingException {
     getLogger().info("Creating Design Document:" + name);
-    String bucket = ((CouchbaseConnectionFactory)connFactory).getBucketName();
+    String bucket = cbConnFactory.getBucketName();
     final String uri = "/" + bucket + "/_design/" + MODE_PREFIX + name;
 
     final CountDownLatch couchLatch = new CountDownLatch(1);
@@ -672,7 +669,7 @@ public class CouchbaseClient extends MemcachedClient
   public HttpFuture<Boolean> asyncDeleteDesignDoc(final String name)
     throws UnsupportedEncodingException {
     getLogger().info("Deleting Design Document:" + name);
-    String bucket = ((CouchbaseConnectionFactory)connFactory).getBucketName();
+    String bucket = cbConnFactory.getBucketName();
 
     final String uri = "/" + bucket + "/_design/" + MODE_PREFIX + name;
 
@@ -736,7 +733,7 @@ public class CouchbaseClient extends MemcachedClient
     String uri = viewUri + queryToRun;
 
     final CountDownLatch couchLatch = new CountDownLatch(1);
-    int timeout = ((CouchbaseConnectionFactory) connFactory).getViewTimeout();
+    int timeout = cbConnFactory.getViewTimeout();
     final ViewFuture crv = new ViewFuture(couchLatch, timeout, view);
 
     final HttpRequest request =
@@ -753,7 +750,7 @@ public class CouchbaseClient extends MemcachedClient
             while (itr.hasNext()) {
               ids.add(itr.next().getId());
             }
-            crv.set(vr, asyncGetBulk(ids), status);
+            crv.set(vr, memcachedClient.asyncGetBulk(ids), status);
           } else {
             crv.set(null, null, status);
           }
@@ -788,7 +785,7 @@ public class CouchbaseClient extends MemcachedClient
       Query query) {
     String uri = view.getURI() + query.toString();
     final CountDownLatch couchLatch = new CountDownLatch(1);
-    int timeout = ((CouchbaseConnectionFactory) connFactory).getViewTimeout();
+    int timeout = cbConnFactory.getViewTimeout();
     final HttpFuture<ViewResponse> crv =
         new HttpFuture<ViewResponse>(couchLatch, timeout);
 
@@ -833,7 +830,7 @@ public class CouchbaseClient extends MemcachedClient
     }
     String uri = view.getURI() + query.toString();
     final CountDownLatch couchLatch = new CountDownLatch(1);
-    int timeout = ((CouchbaseConnectionFactory) connFactory).getViewTimeout();
+    int timeout = cbConnFactory.getViewTimeout();
     final HttpFuture<ViewResponse> crv =
         new HttpFuture<ViewResponse>(couchLatch, timeout);
 
@@ -1251,7 +1248,7 @@ public class CouchbaseClient extends MemcachedClient
   public OperationFuture<Boolean> delete(String key,
           PersistTo req, ReplicateTo rep) {
 
-    if(mconn instanceof CouchbaseMemcachedConnection) {
+    if (mconn instanceof CouchbaseMemcachedConnection) {
       throw new IllegalArgumentException("Durability options are not supported"
         + " on memcached type buckets.");
     }
@@ -2063,7 +2060,7 @@ public class CouchbaseClient extends MemcachedClient
         + " on memcached type buckets.");
     }
 
-    OperationFuture<CASResponse> casOp = asyncCAS(key, cas, value);
+    OperationFuture<CASResponse> casOp = memcachedClient.asyncCAS(key, cas, value);
     CASResponse casr = null;
     try {
       casr = casOp.get();
@@ -2156,7 +2153,7 @@ public class CouchbaseClient extends MemcachedClient
    */
   public Map<MemcachedNode, ObserveResponse> observe(final String key,
       final long cas) {
-    Config cfg = ((CouchbaseConnectionFactory) connFactory).getVBucketConfig();
+    Config cfg = cbConnFactory.getVBucketConfig();
     VBucketNodeLocator locator = ((VBucketNodeLocator)
         ((CouchbaseConnection) mconn).getLocator());
 
@@ -2174,16 +2171,16 @@ public class CouchbaseClient extends MemcachedClient
     final Map<MemcachedNode, ObserveResponse> response =
         new HashMap<MemcachedNode, ObserveResponse>();
 
-    CountDownLatch blatch = broadcastOp(new BroadcastOpFactory() {
+    CountDownLatch blatch = memcachedClient.broadcastOp(new BroadcastOpFactory() {
       public Operation newOp(final MemcachedNode n,
-          final CountDownLatch latch) {
+                             final CountDownLatch latch) {
         return opFact.observe(key, cas, vb, new ObserveOperation.Callback() {
 
           public void receivedStatus(OperationStatus s) {
           }
 
           public void gotData(String key, long retCas, MemcachedNode node,
-              ObserveResponse or) {
+                              ObserveResponse or) {
             if (cas == retCas) {
               response.put(node, or);
             } else /* cas doesn't match */ {
@@ -2195,6 +2192,7 @@ public class CouchbaseClient extends MemcachedClient
               }
             }
           }
+
           public void complete() {
             latch.countDown();
           }
@@ -2216,17 +2214,15 @@ public class CouchbaseClient extends MemcachedClient
    */
   @Override
   public int getNumVBuckets() {
-    return ((CouchbaseConnectionFactory)connFactory).getVBucketConfig()
-      .getVbucketsCount();
+    return cbConnFactory.getVBucketConfig().getVbucketsCount();
   }
 
   @Override
   public boolean shutdown(long timeout, TimeUnit unit) {
     boolean shutdownResult = false;
     try {
-      shutdownResult = super.shutdown(timeout, unit);
-      CouchbaseConnectionFactory cf = (CouchbaseConnectionFactory) connFactory;
-      cf.getConfigurationProvider().shutdown();
+      shutdownResult = memcachedClient.shutdown(timeout, unit);
+      cbConnFactory.getConfigurationProvider().shutdown();
       if(vconn != null) {
         vconn.shutdown();
       }
@@ -2240,7 +2236,7 @@ public class CouchbaseClient extends MemcachedClient
   }
 
   private void checkObserveReplica(String key, int numPersist, int numReplica) {
-    Config cfg = ((CouchbaseConnectionFactory) connFactory).getVBucketConfig();
+    Config cfg = cbConnFactory.getVBucketConfig();
     VBucketNodeLocator locator = ((VBucketNodeLocator)
         ((CouchbaseConnection) mconn).getLocator());
 
@@ -2300,7 +2296,7 @@ public class CouchbaseClient extends MemcachedClient
     long obsPollInterval = cbConnFactory.getObsPollInterval();
     boolean persistMaster = persist.getValue() > 0;
 
-    Config cfg = ((CouchbaseConnectionFactory) connFactory).getVBucketConfig();
+    Config cfg = cbConnFactory.getVBucketConfig();
     VBucketNodeLocator locator = ((VBucketNodeLocator)
         ((CouchbaseConnection) mconn).getLocator());
 
@@ -2426,8 +2422,6 @@ public class CouchbaseClient extends MemcachedClient
 
     final OperationFuture<Boolean> rv =
       new OperationFuture<Boolean>("", latch, operationTimeout) {
-        private CouchbaseConnectionFactory factory =
-          (CouchbaseConnectionFactory) connFactory;
 
         @Override
         public boolean cancel() {
@@ -2456,7 +2450,7 @@ public class CouchbaseClient extends MemcachedClient
         public Boolean get() throws InterruptedException,
           ExecutionException {
           try {
-            return get(factory.getViewTimeout(), TimeUnit.MILLISECONDS);
+            return get(cbConnFactory.getViewTimeout(), TimeUnit.MILLISECONDS);
           } catch (TimeoutException e) {
             throw new RuntimeException("Timed out waiting for operation",
               e);
@@ -2523,6 +2517,10 @@ public class CouchbaseClient extends MemcachedClient
     private boolean status() {
       return flushStatus.booleanValue();
     }
+  }
+
+  MemcachedClient getMemcachedClient() {
+    return memcachedClient;
   }
 
 }
