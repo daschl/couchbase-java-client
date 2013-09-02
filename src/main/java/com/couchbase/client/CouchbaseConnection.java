@@ -26,7 +26,6 @@ import com.couchbase.client.internal.AdaptiveThrottler;
 import com.couchbase.client.internal.ThrottleManager;
 import com.couchbase.client.vbucket.Reconfigurable;
 import com.couchbase.client.vbucket.VBucketNodeLocator;
-import com.couchbase.client.vbucket.config.Bucket;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -42,6 +41,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import com.couchbase.client.vbucket.config.Config;
 import net.spy.memcached.ConnectionObserver;
 import net.spy.memcached.FailureMode;
 import net.spy.memcached.MemcachedConnection;
@@ -80,7 +80,7 @@ public class CouchbaseConnection extends MemcachedConnection  implements
     }
   }
 
-  public void reconfigure(Bucket bucket) {
+  public void reconfigure(Config config) {
     if(reconfiguring) {
       getLogger().debug("Suppressing attempt to reconfigure again while "
         + "reconfiguring.");
@@ -90,7 +90,7 @@ public class CouchbaseConnection extends MemcachedConnection  implements
     reconfiguring = true;
     try {
       // get a new collection of addresses from the received config
-      List<String> servers = bucket.getConfig().getServers();
+      List<String> servers = config.getServers();
       HashSet<SocketAddress> newServerAddresses = new HashSet<SocketAddress>();
       ArrayList<InetSocketAddress> newServers =
           new ArrayList<InetSocketAddress>();
@@ -142,8 +142,7 @@ public class CouchbaseConnection extends MemcachedConnection  implements
 
       // call update locator with new nodes list and vbucket config
       if (locator instanceof VBucketNodeLocator) {
-        ((VBucketNodeLocator)locator).updateLocator(mergedNodes,
-            bucket.getConfig());
+        ((VBucketNodeLocator)locator).updateLocator(mergedNodes, config);
       } else {
         locator.updateLocator(mergedNodes);
       }

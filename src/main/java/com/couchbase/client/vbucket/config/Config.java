@@ -1,66 +1,90 @@
-/**
- * Copyright (C) 2009-2013 Couchbase, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
- */
-
 package com.couchbase.client.vbucket.config;
 
 import java.net.URL;
 import java.util.List;
 
-import net.spy.memcached.HashAlgorithm;
-
-/**
- * A Config.
- */
 public interface Config {
 
-  // Config access
-
+  /**
+   * Returns the amount of replicas currently in the configuration.
+   *
+   * @return
+   */
   int getReplicasCount();
 
+  /**
+   * Returns the number of vbuckets in the configuration.
+   *
+   * @return
+   */
   int getVbucketsCount();
 
+  /**
+   * Returns the number of servers in the configuration.
+   * @return
+   */
   int getServersCount();
 
-  HashAlgorithm getHashAlgorithm();
 
+  /**
+   * Return the hostname for the given server index.
+   *
+   * @param serverIndex the array index of the server.
+   * @return
+   */
   String getServer(int serverIndex);
 
-  // VBucket access
-
+  /**
+   * Returns the active vbucket for a given key.
+   *
+   * @param key the key of the document.
+   * @return
+   */
   int getVbucketByKey(String key);
 
+  /**
+   * Get the master index for the given vbucket.
+   *
+   * @param vbucketIndex
+   * @return
+   */
   int getMaster(int vbucketIndex);
 
+  /**
+   * Get the replica index for the given vbucket and num replica.
+   */
   int getReplica(int vbucketIndex, int replicaIndex);
 
-  int foundIncorrectMaster(int vbucket, int wrongServer);
-
-  ConfigDifference compareTo(Config config);
-
+  /**
+   * Returns all servers known.
+   *
+   * @return
+   */
   List<String> getServers();
 
+  /**
+   * Returns the URIs of the View servers.
+   *
+   * @return
+   */
   List<URL> getCouchServers();
 
-  List<VBucket> getVbuckets();
-
+  /**
+   * Returns the current type of configuration.
+   *
+   * @return
+   */
   ConfigType getConfigType();
+
+  /**
+   * True if there is a chance that the config is stale.
+   *
+   * @return
+   */
+  boolean isProbablyStale();
+
+  /**
+   * Mark this config as probably stale.
+   */
+  void markAsProbablyStale();
 }

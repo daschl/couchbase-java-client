@@ -20,11 +20,33 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.vbucket.config;
+package com.couchbase.client.vbucket.streaming;
+
+import io.netty.channel.CombinedChannelDuplexHandler;
 
 /**
- * A Port.
+ * A codec that is used during the bootstrap phase to walk the Couchbase REST
+ * API autonomously.
  */
-public enum Port {
-  direct, proxy
+public class RestWalkCodec
+  extends CombinedChannelDuplexHandler<RestWalkDecoder, RestWalkEncoder> {
+
+  private final RestWalkDecoder decoder;
+  private final RestWalkEncoder encoder;
+
+  /**
+   * Create a new codec.
+   */
+  public RestWalkCodec(String bucket, String password) {
+    decoder = new RestWalkDecoder(bucket, password);
+    encoder = new RestWalkEncoder(bucket, password);
+
+    init(decoder, encoder);
+  }
+
+  public RestWalkCodec setRestWalkRequest(final RestWalkRequest request) {
+    decoder.setRestWalkRequest(request);
+    return this;
+  }
+
 }

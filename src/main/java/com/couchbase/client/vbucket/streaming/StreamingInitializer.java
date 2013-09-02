@@ -20,22 +20,39 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.vbucket;
+package com.couchbase.client.vbucket.streaming;
 
-import java.util.Observable;
-import java.util.Observer;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.HttpClientCodec;
+
 
 /**
- * A BucketObserverMock.
+ * Initializes the pipeline with all needed codecs.
+ *
+ * Note that the pipeline may change during its lifetime, depending on which
+ * functionality is needed. The codecs added in this initializers are in place
+ * when the channel is constructed and first used.
  */
-public class BucketObserverMock implements Observer {
-  private boolean updateCalled = false;
+public class StreamingInitializer extends ChannelInitializer<SocketChannel> {
 
-  public void update(Observable o, Object arg) {
-    updateCalled = true;
+  public static final String HTTP_CODEC_NAME = "httpCodec";
+  public static final String REST_WALK_CODEC_NAME = "restWalkCodec";
+  public static final String STREAMING_CODEC_NAME = "streamingCodec";
+
+  private final String bucket;
+  private final String password;
+
+  public StreamingInitializer(String bucket, String password) {
+    this.bucket = bucket;
+    this.password = password;
   }
 
-  public boolean isUpdateCalled() {
-    return updateCalled;
+  @Override
+  protected void initChannel(SocketChannel ch) throws Exception {
+    ch.pipeline()
+      .addLast(HTTP_CODEC_NAME, new HttpClientCodec())
+      .addLast(REST_WALK_CODEC_NAME, new RestWalkCodec(bucket, password));
   }
 }
+

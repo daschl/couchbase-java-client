@@ -22,72 +22,51 @@
 
 package com.couchbase.client.vbucket;
 
-import com.couchbase.client.vbucket.config.Bucket;
+import com.couchbase.client.vbucket.config.Config;
 
 /**
- * A ConfigurationProvider.
+ * Methods that need to be provided for all  {@link ConfigurationProvider}
+ * implementations.
  */
 public interface ConfigurationProvider {
 
   /**
-   * Connects to the REST service and retrieves the bucket configuration from
-   * the first pool available.
+   * Returns the current configuration for the connected bucket.
    *
-   * @param bucketname bucketname
-   * @return vbucket configuration
-   * @throws ConfigurationException
+   * @return
    */
-  Bucket getBucketConfiguration(String bucketname);
+  Config get();
 
   /**
-   * Update the bucket including configuration.
+   * Update the current configuration manually.
    *
-   * @param bucketname the name of the bucket
-   * @param newBucket the new bucket including config
+   * @param config
    */
-  void updateBucket(String bucketname, Bucket newBucket);
+  void update(Config config);
+
+  /**
+   * If there is a {@link Config} currently loaded or not.
+   *
+   * @return true if there is a configuration, false otherwise.
+   */
+  boolean hasConfig();
 
   /**
    * Subscribes for configuration updates.
    *
-   * @param bucketName bucket name to receive configuration for
-   * @param rec reconfigurable that will receive updates
-   * @throws ConfigurationException
+   * @param reconfigurable reconfigurable that will receive updates
    */
-  void subscribe(String bucketName, Reconfigurable rec);
-
-  void markForResubscribe(String bucketName, Reconfigurable rec);
+  void subscribe(Reconfigurable reconfigurable);
 
   /**
-   * Unsubscribe from updates on a given bucket and given reconfigurable.
+   * Unsubscribe from configuration updates.
    *
-   * @param vbucketName bucket name
-   * @param rec reconfigurable
+   * @param reconfigurable the reconfigurable to unsubscribe.
    */
-  void unsubscribe(String vbucketName, Reconfigurable rec);
+  void unsubscribe(Reconfigurable reconfigurable);
 
-  /**
-   * Shutdowns a monitor connections to the REST service.
-   */
   void shutdown();
 
-  /**
-   * Retrieves a default bucket name i.e. 'default'.
-   *
-   * @return the anonymous bucket's name i.e. 'default'
-   */
-  String getAnonymousAuthBucket();
-
-  void finishResubscribe();
-
-  /**
-   * Returns the current Reconfigurable object.
-   */
-  Reconfigurable getReconfigurable();
-
-  /**
-   * Returns the current bucket name.
-   */
-  String getBucket();
+  void triggerResubscribe();
 
 }

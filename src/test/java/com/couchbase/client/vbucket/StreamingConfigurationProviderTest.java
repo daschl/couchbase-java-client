@@ -20,20 +20,29 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.vbucket.config;
+package com.couchbase.client.vbucket;
 
-import java.text.ParseException;
-import java.util.Map;
+import com.couchbase.client.vbucket.StreamingConfigurationProvider;
+import com.couchbase.client.vbucket.config.Config;
+import org.junit.Test;
+
+import java.util.Arrays;
 
 /**
- * A ConfigParser.
+ * This test works as an integration test against a real Couchbase cluster
+ * and makes sure that the bootstrap works as expected.
  */
-public interface ConfigurationParser {
-  Map<String, Pool> parseBase(final String base) throws ParseException;
+public class StreamingConfigurationProviderTest {
 
-  Map<String, Bucket> parseBuckets(String buckets) throws ParseException;
+  @Test
+  public void shouldBootstrap() {
+    StreamingConfigurationProvider provider =
+      new StreamingConfigurationProvider("secure", "sec");
 
-  Bucket parseBucket(String sBucket) throws ParseException;
+    Config config = provider.boostrap(Arrays.asList("127.0.0.1"));
+    System.out.println(config.getConfigType());
+    System.out.println(config.getCouchServers());
+    System.out.println(config.getServers());
+  }
 
-  void loadPool(Pool pool, String sPool) throws ParseException;
 }

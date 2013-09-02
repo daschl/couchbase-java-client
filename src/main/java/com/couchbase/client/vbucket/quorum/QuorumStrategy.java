@@ -20,28 +20,23 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.vbucket.config;
+package com.couchbase.client.vbucket.quorum;
+
+import com.couchbase.client.vbucket.config.Config;
+
+import java.util.List;
 
 /**
- * A ConfigParseException.
+ * Common interface for all {@link QuorumStrategy} implementations..
  */
-public class ConfigParsingException extends RuntimeException {
+public interface QuorumStrategy {
 
-  private static final long serialVersionUID = -8393032485475738369L;
+  /**
+   * Apply the strategy on the list of configurations.
+   *
+   * @param configs the possible configurations.
+   * @return the agreed on configuration.
+   */
+  Config apply(List<Config> configs);
 
-  public ConfigParsingException() {
-    super();
-  }
-
-  public ConfigParsingException(String message) {
-    super(message);
-  }
-
-  public ConfigParsingException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
-  public ConfigParsingException(Throwable cause) {
-    super(cause);
-  }
 }

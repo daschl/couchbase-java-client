@@ -23,7 +23,6 @@
 package com.couchbase.client.vbucket;
 
 import com.couchbase.client.vbucket.config.Config;
-import com.couchbase.client.vbucket.config.ConfigDifference;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
@@ -181,19 +180,7 @@ public class VBucketNodeLocator extends SpyObject implements NodeLocator {
   public void updateLocator(final Collection<MemcachedNode> nodes,
       final Config newconf) {
     Config current = fullConfig.get().getConfig();
-
-    ConfigDifference compareTo = current.compareTo(newconf);
-
-    if (compareTo.isSequenceChanged() || compareTo.getVbucketsChanges() > 0
-      || current.getCouchServers().size() != newconf.getCouchServers().size()) {
-      getLogger().debug("Updating configuration, received updated configuration"
-        + " with significant changes.");
-      fullConfig.set(new TotalConfig(newconf,
-              fillNodesEntries(newconf, nodes)));
-    } else {
-      getLogger().debug("Received updated configuration with insignificant "
-        + "changes.");
-    }
+    fullConfig.set(new TotalConfig(newconf , fillNodesEntries(newconf, nodes)));
   }
 
   /**

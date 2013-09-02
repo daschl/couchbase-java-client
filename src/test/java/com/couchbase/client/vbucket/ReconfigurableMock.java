@@ -22,12 +22,12 @@
 
 package com.couchbase.client.vbucket;
 
-import com.couchbase.client.vbucket.config.Bucket;
+import com.couchbase.client.vbucket.config.Config;
 
 /**
  * A ReconfigurableMock.
  */
 public class ReconfigurableMock implements Reconfigurable {
-  public void reconfigure(Bucket bucket) {
+  public void reconfigure(Config config) {
   }
 }

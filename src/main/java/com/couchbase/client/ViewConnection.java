@@ -28,7 +28,6 @@ import com.couchbase.client.http.AsyncConnectionManager;
 import com.couchbase.client.http.RequeueOpCallback;
 import com.couchbase.client.protocol.views.HttpOperation;
 import com.couchbase.client.vbucket.Reconfigurable;
-import com.couchbase.client.vbucket.config.Bucket;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -40,6 +39,8 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import com.couchbase.client.vbucket.config.Config;
 import net.spy.memcached.AddrUtil;
 import net.spy.memcached.ConnectionObserver;
 import net.spy.memcached.compat.SpyObject;
@@ -275,16 +276,16 @@ public class ViewConnection extends SpyObject implements
    * takes care that those operations are performed in the correct order and
    * are executed in a thread-safe manner.
    *
-   * @param bucket the bucket which has been rebalanced.
+   * @param config the bucket which has been rebalanced.
    */
-  public void reconfigure(Bucket bucket) {
+  public void reconfigure(Config config) {
     reconfiguring = true;
 
     try {
       // get a new collection of addresses from the received config
       HashSet<SocketAddress> newServerAddresses = new HashSet<SocketAddress>();
       List<InetSocketAddress> newServers =
-        AddrUtil.getAddressesFromURL(bucket.getConfig().getCouchServers());
+        AddrUtil.getAddressesFromURL(config.getCouchServers());
       for (InetSocketAddress server : newServers) {
         // add parsed address to our collections
         newServerAddresses.add(server);

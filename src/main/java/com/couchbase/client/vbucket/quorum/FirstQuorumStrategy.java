@@ -20,30 +20,27 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.vbucket;
+package com.couchbase.client.vbucket.quorum;
+
+import com.couchbase.client.vbucket.config.Config;
+
+import java.util.List;
 
 /**
- * portions Copyright 2009 Red Hat, Inc. as provided under an Apache 2.0 license
- * from the netty project.
+ * A simple quorum approach where the first successful configuration is used.
+ *
+ * Strictly speaking, this is not a quorum but the only possible implementation
+ * when only one configuration could be reached.
  */
+public class FirstQuorumStrategy implements QuorumStrategy {
 
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
-import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
-
-import static org.jboss.netty.channel.Channels.pipeline;
-
-/**
- * A BucketMonitorPipelineFactory.
- */
-public class BucketMonitorPipelineFactory implements ChannelPipelineFactory {
-
-  public ChannelPipeline getPipeline() {
-    ChannelPipeline pipeline = pipeline();
-    pipeline.addLast("decoder", new HttpResponseDecoder());
-    pipeline.addLast("encoder", new HttpRequestEncoder());
-    pipeline.addLast("handler", new BucketUpdateResponseHandler());
-    return pipeline;
+  @Override
+  public Config apply(List<Config> configs) {
+    if (configs.size() < 1) {
+      throw new QuorumException("Minimum number of configurations not available"
+        + " (found: " + configs.size() + ", needed at least 1");
+    }
+    return configs.get(0);
   }
+
 }

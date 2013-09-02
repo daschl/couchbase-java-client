@@ -22,13 +22,13 @@
 
 package com.couchbase.client.vbucket;
 
-import com.couchbase.client.vbucket.config.Bucket;
-import com.couchbase.client.vbucket.config.CacheConfig;
-import com.couchbase.client.vbucket.config.Node;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import com.couchbase.client.vbucket.config.Config;
+import com.couchbase.client.vbucket.config.MemcachedConfig;
 import net.spy.memcached.TestConfig;
 
 /**
@@ -37,39 +37,37 @@ import net.spy.memcached.TestConfig;
 public class ConfigurationProviderMemcacheMock
   implements ConfigurationProvider {
 
-  public Bucket getBucketConfiguration(String bucketname) {
+  private Config config;
 
-    CacheConfig config = new CacheConfig(1);
-    config.setServers(Arrays.asList(TestConfig.IPV4_ADDR+":8091"));
-    URI streamingURI = URI.create("http://"+TestConfig.IPV4_ADDR+":8091");
-    List<Node> nodes = new ArrayList<Node>();
-
-    return new Bucket(bucketname, config, streamingURI, nodes);
-  }
-
-  public void subscribe(String bucketName, Reconfigurable rec) {}
-
-  public void markForResubscribe(String bucketName, Reconfigurable rec) {}
-
-  public void unsubscribe(String vbucketName, Reconfigurable rec) {}
-
-  public void shutdown() {}
-
-  public String getAnonymousAuthBucket() {
-    return "";
-  }
-
-  public void finishResubscribe() {}
-
-  public Reconfigurable getReconfigurable() {
-    throw new UnsupportedOperationException("Not needed in the mock?");
-  }
-
-  public String getBucket() {
-    throw new UnsupportedOperationException("Not needed in the mock?");
+  public ConfigurationProviderMemcacheMock() {
+    config = new MemcachedConfig(Arrays.asList(TestConfig.IPV4_ADDR));
   }
 
   @Override
-  public void updateBucket(String string, Bucket bucket) { }
+  public Config get() {
+    return config;
+  }
+
+  @Override
+  public void update(Config config) {
+    this.config = config;
+  }
+
+  @Override
+  public boolean hasConfig() {
+    return true;
+  }
+
+  @Override
+  public void subscribe(Reconfigurable reconfigurable) { }
+
+  @Override
+  public void unsubscribe(Reconfigurable reconfigurable) { }
+
+  @Override
+  public void shutdown() { }
+
+  @Override
+  public void triggerResubscribe() { }
 
 }

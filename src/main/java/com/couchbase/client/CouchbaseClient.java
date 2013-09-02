@@ -50,7 +50,6 @@ import com.couchbase.client.protocol.views.ViewResponse;
 import com.couchbase.client.protocol.views.ViewRow;
 import com.couchbase.client.vbucket.Reconfigurable;
 import com.couchbase.client.vbucket.VBucketNodeLocator;
-import com.couchbase.client.vbucket.config.Bucket;
 import com.couchbase.client.vbucket.config.Config;
 import com.couchbase.client.vbucket.config.ConfigType;
 import java.io.IOException;
@@ -248,7 +247,7 @@ public class CouchbaseClient extends MemcachedClient
     }
 
     getLogger().info(MODE_ERROR);
-    cf.getConfigurationProvider().subscribe(cf.getBucketName(), this);
+    cf.getConfigurationProvider().subscribe(this);
   }
 
   /**
@@ -256,29 +255,26 @@ public class CouchbaseClient extends MemcachedClient
    *
    * This method is intended for internal use only.
    */
-  public void reconfigure(Bucket bucket) {
+  public void reconfigure(Config config) {
     reconfiguring = true;
-    if (bucket.isNotUpdating()) {
+    if (config.isProbablyStale()) {
       getLogger().info("Bucket configuration is disconnected from cluster "
         + "configuration updates, attempting to reconnect.");
       CouchbaseConnectionFactory cbcf = (CouchbaseConnectionFactory)connFactory;
-      cbcf.requestConfigReconnect(cbcf.getBucketName(), this);
+      cbcf.requestConfigReconnect(this);
       cbcf.checkConfigUpdate();
     }
     try {
-      cbConnFactory.getConfigurationProvider().updateBucket(
-        cbConnFactory.getBucketName(), bucket);
-
       if(vconn != null) {
-        vconn.reconfigure(bucket);
+        vconn.reconfigure(config);
       }
       if (mconn instanceof CouchbaseConnection) {
         CouchbaseConnection cbConn = (CouchbaseConnection) mconn;
-        cbConn.reconfigure(bucket);
+        cbConn.reconfigure(config);
       } else {
         CouchbaseMemcachedConnection cbMConn =
           (CouchbaseMemcachedConnection) mconn;
-        cbMConn.reconfigure(bucket);
+        cbMConn.reconfigure(config);
       }
     } catch (IllegalArgumentException ex) {
       getLogger().warn("Failed to reconfigure client, staying with "

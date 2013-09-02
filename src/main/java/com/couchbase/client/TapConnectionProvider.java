@@ -24,7 +24,6 @@ package com.couchbase.client;
 
 import com.couchbase.client.vbucket.ConfigurationProvider;
 import com.couchbase.client.vbucket.Reconfigurable;
-import com.couchbase.client.vbucket.config.Bucket;
 
 import java.io.IOException;
 import java.net.URI;
@@ -32,6 +31,7 @@ import java.util.List;
 
 import javax.naming.ConfigurationException;
 
+import com.couchbase.client.vbucket.config.Config;
 import net.spy.memcached.AddrUtil;
 import net.spy.memcached.ConnectionObserver;
 import net.spy.memcached.MemcachedNode;
@@ -73,7 +73,7 @@ public class TapConnectionProvider
     super(cf, AddrUtil.getAddresses(cf.getVBucketConfig().getServers()));
     this.cf=cf;
     cp = cf.getConfigurationProvider();
-    cp.subscribe(cf.getBucketName(), this);
+    cp.subscribe(this);
   }
 
   /**
@@ -86,8 +86,8 @@ public class TapConnectionProvider
     return conn.removeObserver(obs);
   }
 
-  public void reconfigure(Bucket bucket) {
-    ((CouchbaseConnection)conn).reconfigure(bucket);
+  public void reconfigure(Config config) {
+    ((CouchbaseConnection)conn).reconfigure(config);
   }
 
   public boolean isPrimaryForKey(MemcachedNode node, String key) {

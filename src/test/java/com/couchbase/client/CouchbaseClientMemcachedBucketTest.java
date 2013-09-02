@@ -69,7 +69,7 @@ public class CouchbaseClientMemcachedBucketTest {
       );
 
       CouchbaseClient client = new CouchbaseClient(factory);
-      client.reconfigure(factory.getBucket("memcached-default"));
+      client.reconfigure(factory.getConfig());
       client.shutdown();
     } catch(Exception e) {
       success = false;

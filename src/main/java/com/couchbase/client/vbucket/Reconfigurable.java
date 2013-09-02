@@ -22,7 +22,7 @@
 
 package com.couchbase.client.vbucket;
 
-import com.couchbase.client.vbucket.config.Bucket;
+import com.couchbase.client.vbucket.config.Config;
 
 /**
  * Interface provides a method for receiving configuration updates.
@@ -31,7 +31,7 @@ public interface Reconfigurable {
   /**
    * Call on a configuration update.
    *
-   * @param bucket updated vbucket configuration
+   * @param config updated vbucket configuration
    */
-  void reconfigure(Bucket bucket);
+  void reconfigure(Config config);
 }

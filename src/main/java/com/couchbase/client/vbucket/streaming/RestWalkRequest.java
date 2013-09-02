@@ -20,35 +20,32 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.vbucket.config;
+package com.couchbase.client.vbucket.streaming;
+
+import com.couchbase.client.vbucket.config.Config;
+
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 /**
- * A VBucket.
+ * A simple wrapper class that bundles information which gets passed down
+ * to the handler.
  */
-public class VBucket {
+public class RestWalkRequest {
 
-  public static final int MAX_REPLICAS = 4;
+  private final CountDownLatch latch;
+  private final List<Config> configs;
 
-  public static final int MAX_BUCKETS = 65536;
-
-  private volatile int master;
-
-  private final int[] replicas;
-
-  public VBucket(int m, int[] r) {
-    master = m;
-    replicas = r.clone();
+  public RestWalkRequest(CountDownLatch latch, List<Config> configs) {
+    this.latch = latch;
+    this.configs = configs;
   }
 
-  public int getMaster() {
-    return master;
+  public CountDownLatch getLatch() {
+    return latch;
   }
 
-  public int getReplica(int n) {
-    return replicas[n];
-  }
-
-  public void setMaster(int rv) {
-    master = rv;
+  public List<Config> getConfigs() {
+    return configs;
   }
 }

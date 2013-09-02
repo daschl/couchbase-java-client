@@ -24,12 +24,14 @@ package com.couchbase.client.vbucket;
 
 import com.couchbase.client.vbucket.config.Config;
 import com.couchbase.client.vbucket.config.ConfigFactory;
-import com.couchbase.client.vbucket.config.DefaultConfigFactory;
 
 import java.net.InetSocketAddress;
+import java.net.URL;
 import java.util.Arrays;
 
+import com.couchbase.client.vbucket.config.CouchbaseConfig;
 import junit.framework.TestCase;
+import net.spy.memcached.HashAlgorithmRegistry;
 import net.spy.memcached.MemcachedNode;
 import org.junit.Test;
 
@@ -43,43 +45,6 @@ import static org.easymock.EasyMock.verify;
  */
 public class VBucketNodeLocatorTest extends TestCase {
 
-  private static final String CONFIG_IN_ENVELOPE =
-      "{ \"otherKeyThatIsIgnored\": 12345,\n"
-      + "\"nodes\": [\n"
-      + "{\n"
-      + "\"clusterCompatibility\": 1,\n"
-      + "\"clusterMembership\": \"active\"\n,"
-      + "\"couchApiBase\": \"http://10.2.1.67:5984/\"\n"
-      + "}\n"
-      + "],\n"
-      + "\"vBucketServerMap\": \n"
-      + "{\n"
-      + "  \"hashAlgorithm\": \"CRC\",\n"
-      + "  \"numReplicas\": 2,\n"
-      + "  \"serverList\": [\"127.0.0.1:11211\", \"127.0.0.1:11210\", \""
-      + "127.0.0.1:11212\"],\n"
-      + "  \"vBucketMap\":\n" + "    [\n" + "      [0, 1, 2],\n"
-      + "      [1, 2, 0],\n" + "      [2, 1, -1],\n" + "      [1, 2, 0]\n"
-      + "    ]\n" + "}" + "}";
-
-  private static final String NO_REPLICA_CONFIG_IN_ENVELOPE =
-      "{ \"otherKeyThatIsIgnored\": 12345,\n"
-      + "\"nodes\": [\n"
-      + "{\n"
-      + "\"clusterCompatibility\": 1,\n"
-      + "\"clusterMembership\": \"active\"\n,"
-      + "\"couchApiBase\": \"http://10.2.1.67:5984/\"\n"
-      + "}\n"
-      + "],\n"
-      + "\"vBucketServerMap\": \n"
-      + "{\n"
-      + "  \"hashAlgorithm\": \"CRC\",\n"
-      + "  \"numReplicas\": 0,\n"
-      + "  \"serverList\": [\"127.0.0.1:11211\", \"127.0.0.1:11210\"],\n"
-      + "  \"vBucketMap\":\n" + "    [\n" + "      [-1],\n"
-      + "      [-1],\n" + "      [0],\n" + "      [0]\n"
-      + "    ]\n" + "}" + "}";
-
   /**
    * Get primary memcached node for a given key.
    *
@@ -89,7 +54,7 @@ public class VBucketNodeLocatorTest extends TestCase {
    * @post Asserts true if node1 is the primary node.
    * Verify the three nodes.
    */
-  public void testGetPrimary() {
+  public void testGetPrimary() throws Exception {
     MemcachedNode node1 = createMock(MemcachedNode.class);
     MemcachedNode node2 = createMock(MemcachedNode.class);
     MemcachedNode node3 = createMock(MemcachedNode.class);
@@ -103,8 +68,18 @@ public class VBucketNodeLocatorTest extends TestCase {
 
     replay(node1, node2, node3);
 
-    ConfigFactory factory = new DefaultConfigFactory();
-    Config config = factory.create(CONFIG_IN_ENVELOPE);
+    Config config = new CouchbaseConfig(
+      Arrays.asList("127.0.0.1:1211", "127.0.0.1:11210", "127.0.0.1:11212"),
+      Arrays.asList(
+        Arrays.asList(0, 1, 2),
+        Arrays.asList(1, 2, 0),
+        Arrays.asList(2, 1, -1),
+        Arrays.asList(1, 2, 0)
+      ),
+      2,
+      Arrays.asList(new URL("http://10.2.1.67:5984/")),
+      HashAlgorithmRegistry.lookupHashAlgorithm("CRC")
+    );
 
     VBucketNodeLocator locator =
         new VBucketNodeLocator(Arrays.asList(node1, node2, node3), config);
@@ -121,15 +96,25 @@ public class VBucketNodeLocatorTest extends TestCase {
    * addresses. Using the default config and the VBucketNodeLocator
    * instance, get primary and alternative nodes.
    */
-  public void testGetAlternative() {
+  public void testGetAlternative() throws Exception {
     MemcachedNodeMockImpl node1 = new MemcachedNodeMockImpl();
     MemcachedNodeMockImpl node2 = new MemcachedNodeMockImpl();
     MemcachedNodeMockImpl node3 = new MemcachedNodeMockImpl();
     node1.setSocketAddress(new InetSocketAddress("127.0.0.1", 11211));
     node2.setSocketAddress(new InetSocketAddress("127.0.0.1", 11210));
     node3.setSocketAddress(new InetSocketAddress("127.0.0.1", 11212));
-    ConfigFactory configFactory = new DefaultConfigFactory();
-    Config config = configFactory.create(CONFIG_IN_ENVELOPE);
+    Config config = new CouchbaseConfig(
+      Arrays.asList("127.0.0.1:1211", "127.0.0.1:11210", "127.0.0.1:11212"),
+      Arrays.asList(
+        Arrays.asList(0, 1, 2),
+        Arrays.asList(1, 2, 0),
+        Arrays.asList(2, 1, -1),
+        Arrays.asList(1, 2, 0)
+      ),
+      2,
+      Arrays.asList(new URL("http://10.2.1.67:5984/")),
+      HashAlgorithmRegistry.lookupHashAlgorithm("CRC")
+    );
     VBucketNodeLocator locator =
         new VBucketNodeLocator(Arrays.asList((MemcachedNode) node1, node2,
             node3), config);
@@ -149,14 +134,24 @@ public class VBucketNodeLocatorTest extends TestCase {
    * node as there are no replicas.
    */
   @Test
-  public void testNoMasterServerForVbucket() {
+  public void testNoMasterServerForVbucket() throws Exception {
     MemcachedNodeMockImpl node1 = new MemcachedNodeMockImpl();
     MemcachedNodeMockImpl node2 = new MemcachedNodeMockImpl();
     node1.setSocketAddress(new InetSocketAddress("127.0.0.1", 11211));
     node2.setSocketAddress(new InetSocketAddress("127.0.0.1", 11210));
 
-    ConfigFactory configFactory = new DefaultConfigFactory();
-    Config config = configFactory.create(NO_REPLICA_CONFIG_IN_ENVELOPE);
+    Config config = new CouchbaseConfig(
+      Arrays.asList("127.0.0.1:1211", "127.0.0.1:11210"),
+      Arrays.asList(
+        Arrays.asList(-1),
+        Arrays.asList(-1),
+        Arrays.asList(0),
+        Arrays.asList(0)
+      ),
+      0,
+      Arrays.asList(new URL("http://10.2.1.67:5984/")),
+      HashAlgorithmRegistry.lookupHashAlgorithm("CRC")
+    );
 
     VBucketNodeLocator locator = new VBucketNodeLocator(
       Arrays.asList((MemcachedNode) node1, node2),
